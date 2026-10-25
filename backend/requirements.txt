@@ -1,0 +1,19 @@
+# Web framework
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30
+
+# Database (official MongoDB driver with native asyncio support)
+pymongo>=4.13,<5
+
+# Validation & configuration
+pydantic>=2.7,<3
+pydantic-settings>=2.3,<3
+
+# Auth
+PyJWT>=2.8,<3
+bcrypt>=4.1,<6
+
+# Testing
+pytest>=8.0
+pytest-asyncio>=0.23
+httpx>=0.27

@@ -1,0 +1,32 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: hospital-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: hospital-backend
+    environment:
+      MONGO_URI: mongodb://mongo:27017
+      MONGO_DB: hospital
+      JWT_SECRET: dev-secret-change-me
+      PATIENT_LIST_DELAY_SECONDS: "4"
+      SEED_ON_STARTUP: "true"
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+volumes:
+  mongo-data:
