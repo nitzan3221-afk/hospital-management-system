@@ -8,6 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import MongoDatabase
+from app.repositories.mongo_patient_repository import MongoPatientRepository
+from app.repositories.mongo_user_repository import MongoUserRepository
+from app.seed import seed_database
 
 
 @asynccontextmanager
@@ -16,6 +19,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     database = MongoDatabase(settings.mongo_uri, settings.mongo_db)
     app.state.database = database
+
+    patient_repo = MongoPatientRepository(database.db)
+    await patient_repo.ensure_indexes()
+    if settings.seed_on_startup:
+        await seed_database(patient_repo, MongoUserRepository(database.db))
+
     yield
     await database.close()
 
