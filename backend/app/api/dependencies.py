@@ -15,9 +15,11 @@ from app.core.config import Settings, get_settings
 from app.domain.errors import AuthenticationError, PermissionDeniedError
 from app.domain.models import AuthenticatedUser
 from app.domain.permissions import Permission, has_permission
-from app.repositories.base import UserRepository
+from app.repositories.base import PatientRepository, UserRepository
+from app.repositories.mongo_patient_repository import MongoPatientRepository
 from app.repositories.mongo_user_repository import MongoUserRepository
 from app.services.auth_service import AuthService
+from app.services.patient_service import PatientService
 
 _bearer = HTTPBearer(auto_error=False, description="Paste the access_token returned by /api/auth/login")
 
@@ -28,6 +30,14 @@ def get_db(request: Request) -> AsyncDatabase:
 
 def get_user_repository(db: AsyncDatabase = Depends(get_db)) -> UserRepository:
     return MongoUserRepository(db)
+
+
+def get_patient_repository(db: AsyncDatabase = Depends(get_db)) -> PatientRepository:
+    return MongoPatientRepository(db)
+
+
+def get_patient_service(patients: PatientRepository = Depends(get_patient_repository)) -> PatientService:
+    return PatientService(patients)
 
 
 def get_auth_service(

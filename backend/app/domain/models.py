@@ -1,15 +1,18 @@
-"""Domain entities.
+"""Domain entities and the input models used to create / change them.
 
 A patient is stored as a single MongoDB document that embeds its medications, vitals and
 timeline. This makes the patient page a single read, and lets every clinical action
 (e.g. "mark medication as given" + "add timeline event") be one atomic document update.
+
+Input models (``*Create`` / ``*Update``) hold the validation rules; the stored entities
+extend them with server-controlled fields (ids, timestamps, who did it).
 """
 
 from datetime import date, datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.domain.enums import HealthPlan, Role, Sex, TimelineEventType, Ward
 
@@ -22,36 +25,54 @@ def new_id() -> str:
     return uuid4().hex
 
 
-class VitalSigns(BaseModel):
+def _not_in_future(value: date) -> date:
+    if value > date.today():
+        raise ValueError("birth_date cannot be in the future")
+    return value
+
+
+# ---------------------------------------------------------------- vitals
+
+class VitalsCreate(BaseModel):
     """One set of vital-sign measurements. Ranges reject obvious typos, not clinical outliers."""
 
-    heart_rate: int = Field(ge=20, le=250, description="Beats per minute")
-    bp_systolic: int = Field(ge=50, le=260, description="mmHg")
-    bp_diastolic: int = Field(ge=30, le=160, description="mmHg")
-    temperature: float = Field(ge=30.0, le=45.0, description="Celsius")
-    recorded_at: datetime = Field(default_factory=utcnow)
-    recorded_by: str
+    heart_rate: int = Field(ge=20, le=250, description="Beats per minute", examples=[82])
+    bp_systolic: int = Field(ge=50, le=260, description="mmHg", examples=[120])
+    bp_diastolic: int = Field(ge=30, le=160, description="mmHg", examples=[80])
+    temperature: float = Field(ge=30.0, le=45.0, description="Celsius", examples=[36.8])
 
     @model_validator(mode="after")
-    def systolic_above_diastolic(self) -> "VitalSigns":
+    def systolic_above_diastolic(self) -> "VitalsCreate":
         if self.bp_systolic <= self.bp_diastolic:
             raise ValueError("bp_systolic must be greater than bp_diastolic")
         return self
 
 
-class Medication(BaseModel):
+class VitalSigns(VitalsCreate):
+    recorded_at: datetime = Field(default_factory=utcnow)
+    recorded_by: str
+
+
+# ---------------------------------------------------------------- medications
+
+class MedicationCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100, examples=["Amoxicillin"])
+    dose: str = Field(min_length=1, max_length=50, examples=["500 mg"])
+    frequency: str = Field(min_length=1, max_length=50, examples=["every 8 hours"])
+
+
+class Medication(MedicationCreate):
     """A prescription. ``last_given_*`` tracks the most recent administration."""
 
     id: str = Field(default_factory=new_id)
-    name: str = Field(min_length=1, max_length=100)
-    dose: str = Field(min_length=1, max_length=50, examples=["500 mg"])
-    frequency: str = Field(min_length=1, max_length=50, examples=["every 8 hours"])
     active: bool = True
     prescribed_by: str
     prescribed_at: datetime = Field(default_factory=utcnow)
     last_given_at: datetime | None = None
     last_given_by: str | None = None
 
+
+# ---------------------------------------------------------------- timeline
 
 class TimelineEvent(BaseModel):
     """One entry in the patient's chronological event feed."""
@@ -64,17 +85,51 @@ class TimelineEvent(BaseModel):
     details: dict[str, Any] = Field(default_factory=dict)
 
 
-class Patient(BaseModel):
-    """A hospitalized patient. ``id`` is the national ID number (9 digits)."""
+# ---------------------------------------------------------------- patients
 
-    id: str = Field(pattern=r"^\d{9}$")
-    first_name: str = Field(min_length=1, max_length=50)
-    last_name: str = Field(min_length=1, max_length=50)
+class PatientInfo(BaseModel):
+    """Personal / administrative details (maintained by the secretary)."""
+
+    first_name: str = Field(min_length=1, max_length=50, examples=["Dana"])
+    last_name: str = Field(min_length=1, max_length=50, examples=["Levi"])
     sex: Sex
-    birth_date: date
+    birth_date: date = Field(examples=["1985-04-12"])
     health_plan: HealthPlan
     ward: Ward
-    diagnosis: str = Field(min_length=1, max_length=200)
+
+    @field_validator("birth_date")
+    @classmethod
+    def check_birth_date(cls, value: date) -> date:
+        return _not_in_future(value)
+
+
+class PatientCreate(PatientInfo):
+    """Data needed to admit a new patient."""
+
+    id: str = Field(pattern=r"^\d{9}$", description="National ID (9 digits)", examples=["123456789"])
+    diagnosis: str = Field(min_length=1, max_length=200, examples=["Observation after fall"])
+
+
+class PatientUpdate(BaseModel):
+    """Partial update of personal details. Only the fields sent are changed.
+    The diagnosis is deliberately not here — it has its own, doctor-only action."""
+
+    first_name: str | None = Field(default=None, min_length=1, max_length=50)
+    last_name: str | None = Field(default=None, min_length=1, max_length=50)
+    sex: Sex | None = None
+    birth_date: date | None = None
+    health_plan: HealthPlan | None = None
+    ward: Ward | None = None
+
+    @field_validator("birth_date")
+    @classmethod
+    def check_birth_date(cls, value: date | None) -> date | None:
+        return _not_in_future(value) if value is not None else value
+
+
+class Patient(PatientCreate):
+    """A hospitalized patient. ``id`` is the national ID number."""
+
     admitted_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
     medications: list[Medication] = Field(default_factory=list)
@@ -93,6 +148,11 @@ class Patient(BaseModel):
     def latest_vitals(self) -> VitalSigns | None:
         return max(self.vitals, key=lambda v: v.recorded_at, default=None)
 
+    def find_medication(self, medication_id: str) -> Medication | None:
+        return next((m for m in self.medications if m.id == medication_id), None)
+
+
+# ---------------------------------------------------------------- users
 
 class User(BaseModel):
     """A staff member who can log in."""
@@ -110,6 +170,8 @@ class AuthenticatedUser(BaseModel):
     full_name: str
     role: Role
 
+
+# ---------------------------------------------------------------- overview
 
 class PatientSummary(BaseModel):
     """Lightweight projection of a patient for the overview (main) page."""

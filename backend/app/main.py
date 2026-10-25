@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.error_handlers import register_error_handlers
 from app.api.middleware import REQUEST_ID_HEADER, request_context_middleware
-from app.api.routers import auth, health
+from app.api.routers import auth, health, patients
 from app.core.config import get_settings
 from app.core.database import MongoDatabase
 from app.core.logging_config import configure_logging
@@ -57,6 +57,7 @@ def create_app() -> FastAPI:
     register_error_handlers(app)
     app.include_router(health.router)
     app.include_router(auth.router)
+    app.include_router(patients.router)
 
     return app
 
