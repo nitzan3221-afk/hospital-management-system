@@ -4,10 +4,12 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.error_handlers import register_error_handlers
 from app.api.middleware import REQUEST_ID_HEADER, request_context_middleware
+from app.api.routers import auth, health
 from app.core.config import get_settings
 from app.core.database import MongoDatabase
 from app.core.logging_config import configure_logging
@@ -52,11 +54,9 @@ def create_app() -> FastAPI:
         expose_headers=[REQUEST_ID_HEADER],
     )
 
-    @app.get("/api/health", tags=["health"])
-    async def health(request: Request) -> dict[str, str]:
-        """Liveness + database connectivity check."""
-        db_ok = await request.app.state.database.ping()
-        return {"status": "ok" if db_ok else "degraded", "database": "up" if db_ok else "down"}
+    register_error_handlers(app)
+    app.include_router(health.router)
+    app.include_router(auth.router)
 
     return app
 

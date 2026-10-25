@@ -103,6 +103,14 @@ class User(BaseModel):
     password_hash: str
 
 
+class AuthenticatedUser(BaseModel):
+    """The user making the current request, as identified by their access token."""
+
+    username: str
+    full_name: str
+    role: Role
+
+
 class PatientSummary(BaseModel):
     """Lightweight projection of a patient for the overview (main) page."""
 

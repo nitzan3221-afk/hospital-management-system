@@ -18,7 +18,13 @@ from typing import Any
 request_id_var: ContextVar[str | None] = ContextVar("request_id", default=None)
 
 # Attributes every LogRecord has; anything else was passed via ``extra=``.
-_STANDARD_ATTRS = set(logging.LogRecord("", 0, "", 0, "", None, None).__dict__) | {"message", "asctime", "taskName"}
+# ("color_message" is uvicorn's ANSI-colored duplicate of the message — noise in JSON logs.)
+_STANDARD_ATTRS = set(logging.LogRecord("", 0, "", 0, "", None, None).__dict__) | {
+    "message",
+    "asctime",
+    "taskName",
+    "color_message",
+}
 
 
 class JsonFormatter(logging.Formatter):

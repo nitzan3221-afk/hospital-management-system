@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     mongo_db: str = "hospital"
 
     # Auth
-    jwt_secret: str = "change-me-in-production"
+    jwt_secret: str = "change-me-in-production-use-a-long-random-secret"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 480
 
