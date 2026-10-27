@@ -68,6 +68,17 @@ export class PatientListStore {
       });
   }
 
+  /** Drop a deleted patient from the cached list, so it disappears without waiting for a reload. */
+  forget(patientId: string): void {
+    const groups = this.groups();
+    if (!groups) return;
+    this.groups.set(
+      groups
+        .map((g) => ({ ...g, patients: g.patients.filter((p) => p.id !== patientId) }))
+        .filter((g) => g.patients.length > 0),
+    );
+  }
+
   /** Forget everything (on logout). */
   reset(): void {
     this.request?.unsubscribe();

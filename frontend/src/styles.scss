@@ -194,6 +194,36 @@ select.ng-invalid.ng-touched {
   font-size: 0.8rem;
 }
 
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px 16px;
+}
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+/* small form that opens inside a card (vitals, prescription, diagnosis) */
+.inline-form {
+  margin-bottom: 16px;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.inline-form .form-actions {
+  margin-top: 12px;
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
 /* ---------- alerts ---------- */
 .alert {
   display: flex;
